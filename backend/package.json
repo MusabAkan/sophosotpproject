@@ -1,0 +1,24 @@
+{
+  "name": "@sophos-otp/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run build && node --watch dist/backend/src/main.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/backend/src/main.js",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/backend/test/*.test.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.2.8",
+    "@nestjs/core": "11.2.8",
+    "@nestjs/platform-express": "11.2.8",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/express": "^5.0.0",
+    "typescript": "~5.9.3",
+    "tsx": "^4.20.0"
+  }
+}

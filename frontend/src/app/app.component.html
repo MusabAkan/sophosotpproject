@@ -1,0 +1,42 @@
+<div class="scene app-dark">
+  <div class="orb orb-one"></div><div class="orb orb-two"></div><div class="grid-texture"></div>
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="/" aria-label="Ana sayfa"><span class="brand-icon"><i class="pi pi-shield"></i></span><span>Sophos<span class="brand-light">OTP</span><small>PERSONAL AUTHENTICATOR</small></span></a><span class="local-badge"><span></span>Yalnızca bu bilgisayarda</span></header>
+    <section class="intro"><div class="eyebrow"><span class="tiny-line"></span> GÜVENLİ ERİŞİM, TEK BİR YERDE</div><h1>Kodun burada.<br><span>Erişim sende.</span></h1><p>Telefonuna uzanmadan doğrulama kodunu üret.<br>Basit, yerel ve her an hazır.</p></section>
+    <div class="workspace">
+      <section class="glass setup"><div class="panel-heading"><span class="step">01</span><div><h2>Hesabını bağla</h2><p>Tek seferlik oturum kurulumu</p></div><i class="pi pi-sliders-h muted"></i></div>
+        <label class="upload" for="qr-upload" [class.disabled]="qrBusy()"><span class="upload-icon"><i class="pi" [class.pi-qrcode]="!qrBusy()" [class.pi-spin]="qrBusy()" [class.pi-spinner]="qrBusy()"></i></span><strong>{{qrBusy() ? 'QR okunuyor…' : 'QR görselini seç'}}</strong><span>Sophos portalındaki QR ekran görüntüsü</span><small><i class="pi pi-upload"></i> PNG, JPG · En fazla 10 MB</small></label>
+        <input id="qr-upload" class="file-input" type="file" accept="image/*" (change)="readQr($event)" [disabled]="qrBusy()" />
+        <div class="divider"><span></span> veya anahtar kullan <span></span></div>
+        <form (ngSubmit)="start()"><label for="secret">Kurulum anahtarı</label><input pInputText id="secret" type="password" name="secret" [(ngModel)]="input" autocomplete="off" spellcheck="false" placeholder="Base32 anahtarı veya otpauth:// adresi" class="secret-input" /><small class="field-hint">Sophos şifreni değil, OTP kurulum anahtarını gir.</small>
+        <div class="settings"><div><label for="algorithm">Algoritma</label><p-select inputId="algorithm" name="algorithm" [options]="algorithms" [(ngModel)]="algorithm" /></div><div><label for="period">Süre (sn)</label><p-inputnumber inputId="period" name="period" [(ngModel)]="period" [min]="10" [max]="300" [useGrouping]="false" /></div><div><label for="digits">Hane</label><p-select inputId="digits" name="digits" [options]="digitOptions" [(ngModel)]="digits" /></div></div>
+        <p-button type="submit" label="Kodu üret" icon="pi pi-arrow-right" iconPos="right" [loading]="busy()" [disabled]="qrBusy()" styleClass="generate-button" /></form>
+        <div class="privacy"><i class="pi pi-lock"></i><span>Anahtar ve QR diske kaydedilmez.<br>Sekmeyi kapatınca yeniden kurulum gerekir.</span></div>
+      </section>
+      <section class="glass token-panel"><div class="token-top"><span class="eyebrow">DOĞRULAMA KODUN</span><span class="token-status" [class.connected]="active()"><span></span>{{active() ? 'Aktif' : 'Kurulum bekleniyor'}}</span></div>
+        <div class="token-content"><div class="shield-emblem"><i class="pi pi-shield"></i><span class="emblem-dot"></span></div><h2>{{account()}}</h2><p>{{active() ? 'Sophos girişinde kullanıma hazır' : 'Hesabını bağlayarak kod üretmeye başla'}}</p><div class="otp-code" [class.is-empty]="!active()" aria-label="Tek kullanımlık doğrulama kodu">{{displayCode()}}</div>
+        <div class="countdown"><span>{{active() ? 'Yeni kod için' : 'Kod otomatik yenilenir'}}</span><strong>{{active() ? remaining() + ' saniye' : '—'}}</strong></div><p-progressbar [value]="progress()" [showValue]="false" />
+        <p-button label="Kodu kopyala" icon="pi pi-copy" (onClick)="copy()" [disabled]="!active() || remaining() === 0 || busy()" styleClass="copy-button" />
+        <button class="forget" type="button" (click)="forget()"><i class="pi pi-sign-out"></i> Oturumu temizle</button></div>
+        <div class="token-foot"><i class="pi pi-sync"></i> Cihazının tarihi ve saati otomatik ayarlı olmalı.</div>
+      </section>
+    </div>
+    <section class="glass connection-panel">
+      <div class="panel-heading"><span class="step">02</span><div><h2>Sophos’a bağlan</h2><p>Mevcut şifren + güncel OTP, tek tıklamayla</p></div><p-button icon="pi pi-refresh" severity="secondary" [text]="true" ariaLabel="Sophos bağlantılarını yenile" [loading]="infoBusy()" [disabled]="connecting()" (onClick)="loadSophos()" /></div>
+      <form (ngSubmit)="connectVpn()" autocomplete="off">
+        <div class="connection-fields">
+          <div><label for="vpn-profile">Sophos bağlantı adı</label><input pInputText id="vpn-profile" name="profile" [(ngModel)]="profile" placeholder="Bağlantı adını kendin yaz" autocomplete="off" spellcheck="false" [disabled]="connecting()" /></div>
+          <div><label for="vpn-username">Kullanıcı adı</label><input pInputText id="vpn-username" name="vpnUsername" [(ngModel)]="username" autocomplete="off" autocapitalize="none" spellcheck="false" [disabled]="connecting()" placeholder="Kullanıcı adın" /></div>
+          <div><label for="vpn-password">Mevcut şifren (OTP ekleme)</label><input pInputText type="password" id="vpn-password" name="vpnPassword" [(ngModel)]="password" autocomplete="off" [disabled]="connecting()" placeholder="Sadece mevcut şifren" /></div>
+        </div>
+        <div class="connection-actions"><p-button type="submit" label="Sophos’a bağlan" icon="pi pi-sign-in" [loading]="connecting()" [disabled]="!active() || !sophos()?.available || !profile || !username.trim() || !password || remaining() <= 5 || infoBusy()" styleClass="generate-button" /><p-button type="button" label="Kullanıcı adını kopyala" icon="pi pi-user" severity="secondary" [outlined]="true" [disabled]="!username" (onClick)="copyUsername()" /><p-button type="button" label="Şifre + OTP kopyala" icon="pi pi-copy" severity="secondary" [outlined]="true" [disabled]="!active() || !password || remaining() <= 5 || busy()" (onClick)="copyCombined()" /></div>
+      </form>
+      @if(sophos()?.message){<p class="connection-hint">{{sophos()?.message}}</p>}
+      <p class="connection-hint"><i class="pi pi-info-circle"></i> Önce OTP’yi etkinleştir. Bağlan düğmesi Sophos Connect’e giriş isteği gönderir; kodun son 5 saniyesinde yeni kodu bekler.</p>
+      <details class="credential-details"><summary>Giriş bilgilerim nasıl kullanılıyor?</summary><p>Kullanıcı adı ve şifre bu sekmenin belleğinde tutulur, dosyaya kaydedilmez. Bağlan düğmesi şifre + OTP’yi yerel Sophos komut aracına aktarır; bu değer kısa süreliğine Windows süreç komut satırında bulunur. Kopyalama düğmesi şifre + OTP’yi panoya yazar. Oturumu temizle uygulamadaki bilgileri siler; panoyu silmez.</p></details>
+    </section>
+    <div class="feedback" aria-live="polite">@if(error()){<p-message severity="error">{{error()}}</p-message>} @if(notice()){<p-message severity="success">{{notice()}}</p-message>}</div>
+    <footer><span><i class="pi pi-desktop"></i> Yerel çalışma · Bulut senkronizasyonu yok</span><span>Angular 21 <b>·</b> PrimeNG 21 <b>·</b> NestJS</span></footer>
+  </main>
+</div>
+
