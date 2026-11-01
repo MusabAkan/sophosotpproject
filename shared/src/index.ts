@@ -6,3 +6,9 @@ export interface SophosInfo { available: boolean; profiles: string[]; message?: 
 export interface ConnectVpnRequest { profile: string; username: string; password: string; otp: GenerateOtpRequest; }
 export interface ConnectVpnResponse { submitted: true; message: string; }
 
+
+export type AppLanguage = 'tr' | 'en' | 'de' | 'fr' | 'es';
+export interface SavedProfile { version: 1; language: AppLanguage; profile: string; username: string; password: string; otp: GenerateOtpRequest | null; }
+export interface DesktopBridge { session(): Promise<{token: string}>; load(): Promise<SavedProfile | null>; save(profile: SavedProfile): Promise<boolean>; remove(): Promise<boolean>; }
+declare global { interface Window { sophosDesktop?: DesktopBridge; } }
+

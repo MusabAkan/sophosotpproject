@@ -4,8 +4,9 @@
     "outDir": "dist-test"
   },
   "include": [
-    "src/otp.ts",
+    "src/**/*.ts",
     "test/**/*.ts",
-    "../shared/src/**/*.ts"
+    "../shared/src/**/*.ts",
+    "../frontend/src/app/i18n.ts"
   ]
 }

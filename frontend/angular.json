@@ -11,18 +11,33 @@
       "sourceRoot": "src",
       "architect": {
         "build": {
-          "builder": "@angular/build:application",
+          "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": "dist",
-            "browser": "src/main.ts",
+            "outputPath": "dist/browser",
             "index": "src/index.html",
             "tsConfig": "tsconfig.json",
             "styles": [
               "src/styles.css"
+            ],
+            "main": "src/main.ts",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
+              }
             ]
           },
           "configurations": {
             "production": {
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              },
               "outputHashing": "all",
               "budgets": [
                 {
@@ -35,7 +50,7 @@
           }
         },
         "serve": {
-          "builder": "@angular/build:dev-server",
+          "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
             "buildTarget": "otp-web:build",
             "proxyConfig": "proxy.conf.json"

@@ -8,18 +8,47 @@ import { SelectModule } from 'primeng/select';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageModule } from 'primeng/message';
-import type { GenerateOtpRequest, GenerateOtpResponse, OtpAlgorithm, SophosInfo, ConnectVpnResponse } from '../../../shared/src';
+import type { GenerateOtpRequest, GenerateOtpResponse, OtpAlgorithm, SophosInfo, ConnectVpnResponse, AppLanguage } from '../../../shared/src';
+
+import {translate,languages,DEFAULT_LANGUAGE,type MessageKey} from './i18n';
 
 @Component({ selector: 'app-root', standalone: true,
   imports: [FormsModule, ButtonModule, InputTextModule, SelectModule, InputNumberModule, ProgressBarModule, MessageModule],
   templateUrl: './app.component.html' })
 export class AppComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  readonly desktop = window.sophosDesktop;
+  readonly languages = languages;
+  readonly language = signal<AppLanguage>(DEFAULT_LANGUAGE);
+  readonly saving = signal(false); readonly restoring = signal(false);
+  remember = true;
+  t(key: MessageKey) { return translate(this.language(),key); }
+  setLanguage(value: AppLanguage) { this.language.set(value); document.documentElement.lang=value; if(this.desktop && this.config && this.remember)void this.saveProfile(); }
+  async saveProfile() {
+    if(!this.desktop || !this.config || this.saving())return false;
+    this.saving.set(true);
+    try { await this.desktop.save({version:1,language:this.language(),profile:this.profile,username:this.username,password:this.password,otp:{...this.config}}); this.notice.set(this.t('saved')); return true; }
+    catch {this.error.set(this.t('saveFailed'));return false;}finally{this.saving.set(false);}
+  }
+  async deleteSaved() {
+    try {await this.desktop?.remove();this.forget();this.notice.set(this.t('deleted'));}
+    catch {this.error.set(this.t('deletionFailed'));}
+  }
+  private async restoreProfile() {
+    if(!this.desktop)return;
+    this.restoring.set(true);
+    try {const saved=await this.desktop.load();if(!saved)return;
+      this.language.set(saved.language);document.documentElement.lang=saved.language;
+      this.profile=saved.profile;this.username=saved.username;this.password=saved.password;
+      if(saved.otp){this.config={...saved.otp};this.algorithm=saved.otp.algorithm;this.period=saved.otp.period;this.digits=saved.otp.digits;await this.refresh(this.version);}
+      if(this.active())this.notice.set(this.t('restored'));
+    }catch{this.error.set(this.t('restoreFailed'));}finally{this.restoring.set(false);}
+  }
   input = ''; algorithm: OtpAlgorithm = 'SHA1'; period = 30; digits: 6 | 8 = 6;
   readonly algorithms = ['SHA1','SHA256','SHA512']; readonly digitOptions = [6,8];
   readonly busy = signal(false); readonly qrBusy = signal(false); readonly error = signal(''); readonly notice = signal('');
   readonly result = signal<GenerateOtpResponse | null>(null); readonly remaining = signal(0);
-  readonly active = signal(false); readonly account = signal('Yerel hesap');
+  readonly active = signal(false); readonly account = signal('Local account');
   readonly progress = computed(() => this.result() ? this.remaining() / this.result()!.period * 100 : 0);
   readonly displayCode = computed(() => { const value = this.result()?.code; return value ? value.slice(0,value.length / 2) + ' ' + value.slice(value.length / 2) : '••• •••'; });
   private config: GenerateOtpRequest | null = null;
@@ -36,18 +65,18 @@ export class AppComponent implements OnInit, OnDestroy {
       const config: GenerateOtpRequest = { secret: this.input.trim(), algorithm: this.algorithm, period: this.period, digits: this.digits };
       if (config.secret.startsWith('otpauth://')) {
         const uri = new URL(config.secret);
-        if (uri.hostname !== 'totp') throw new Error('Yalnızca TOTP QR kodları desteklenir.');
+        if (uri.hostname !== 'totp') throw new Error(this.t('invalidSetup'));
         config.secret = uri.searchParams.get('secret') ?? '';
         config.algorithm = (uri.searchParams.get('algorithm') ?? 'SHA1').toUpperCase() as OtpAlgorithm;
         config.period = Number(uri.searchParams.get('period') ?? 30);
         config.digits = Number(uri.searchParams.get('digits') ?? 6) as 6 | 8;
-        this.account.set(decodeURIComponent(uri.pathname.slice(1)).slice(0,80) || 'Yerel hesap');
+        this.account.set(decodeURIComponent(uri.pathname.slice(1)).slice(0,80) || 'Local account');
       }
-      if (!config.secret) throw new Error('Önce kurulum anahtarını girin veya QR görseli seçin.');
+      if (!config.secret) throw new Error(this.t('missingSecret'));
       this.config = config;
       await this.refresh(this.version);
-      if (this.active()) this.input = '';
-    } catch (error) { this.error.set(error instanceof Error ? error.message : 'Kurulum bilgisi okunamadı.'); }
+      if (this.active()) { this.input = ''; if(this.desktop && this.remember)await this.saveProfile(); }
+    } catch (error) { this.error.set(this.t('invalidSetup')); }
   }
   private async refresh(version: number) {
     if (!this.config || this.busy()) return;
@@ -62,14 +91,14 @@ export class AppComponent implements OnInit, OnDestroy {
       if (version !== this.version) return;
       this.result.set(null); this.active.set(false); this.config = null;
       const message = error instanceof HttpErrorResponse ? error.error?.message : '';
-      this.error.set(typeof message === 'string' ? message : 'Backend’e ulaşılamadı. Başlatıcıyı ve 3000 portunu kontrol edin.');
+      this.error.set(this.language()==='en' && typeof message==='string' && message ? message : this.t('requestFailed'));
     } finally { if (version === this.version) this.busy.set(false); }
   }
   private updateRemaining() { const result = this.result(); this.remaining.set(result ? Math.max(0, Math.ceil((result.validUntil - Date.now() - this.offset) / 1000)) : 0); }
   private tick() { this.updateRemaining(); if (this.active() && !this.remaining() && !this.busy()) void this.refresh(this.version); }
-  clear() { this.version++; this.config = null; this.result.set(null); this.active.set(false); this.busy.set(false); this.remaining.set(0); this.notice.set(''); this.account.set('Yerel hesap'); }
-  forget() { this.clear(); this.input = ''; this.username = ''; this.password = ''; this.profile = ''; this.error.set(''); this.notice.set('Oturum temizlendi.'); }
-  ngOnInit() { void this.loadSophos(); }
+  clear() { this.version++; this.config = null; this.result.set(null); this.active.set(false); this.busy.set(false); this.remaining.set(0); this.notice.set(''); this.account.set('Local account'); }
+  forget() { this.clear(); this.input = ''; this.username = ''; this.password = ''; this.profile = ''; this.error.set(''); this.notice.set(this.t('cleared')); }
+  ngOnInit() { void this.loadSophos(); void this.restoreProfile(); }
   async loadSophos() {
     if (this.infoBusy()) return;
     this.infoBusy.set(true);
@@ -77,58 +106,60 @@ export class AppComponent implements OnInit, OnDestroy {
       const info = await firstValueFrom(this.http.get<SophosInfo>('/api/sophos/info'));
       this.sophos.set(info);
 
-    } catch { this.sophos.set({ available: false, profiles: [], message: 'Sophos bilgisi alınamadı. Backend’i güncelleyip yeniden başlat.' }); }
+    } catch { this.sophos.set({ available: false, profiles: [], message: 'Cannot load Sophos status.' }); }
     finally { this.infoBusy.set(false); }
   }
   async copyUsername() {
-    try { await navigator.clipboard.writeText(this.username); this.notice.set('Kullanıcı adı kopyalandı.'); }
-    catch { this.error.set('Panoya erişilemedi.'); }
+    try { await navigator.clipboard.writeText(this.username); this.notice.set(this.t('userCopied')); }
+    catch { this.error.set(this.t('copyFailed')); }
   }
   async copyCombined() {
     this.updateRemaining();
     if (!this.password || !this.result() || this.remaining() <= 5 || this.busy()) {
-      this.error.set('Mevcut şifreni gir; kodun en az 5 saniyesi kaldığından emin ol.'); return;
+      this.error.set(this.t('waitCode')); return;
     }
-    try { await navigator.clipboard.writeText(this.password + this.result()!.code); this.notice.set('Şifre + OTP kopyalandı. Kod bitmeden Sophos’a yapıştır.'); }
-    catch { this.error.set('Panoya erişilemedi.'); }
+    try { await navigator.clipboard.writeText(this.password + this.result()!.code); this.notice.set(this.t('combinedCopied')); }
+    catch { this.error.set(this.t('copyFailed')); }
   }
   async connectVpn() {
     if (this.connecting() || !this.config || !this.active()) return;
     this.error.set(''); this.notice.set('');
-    if (!this.username.trim() || !this.password || !this.profile) { this.error.set('Bağlantı, kullanıcı adı ve mevcut şifreyi doldur.'); return; }
+    if (!this.username.trim() || !this.password || !this.profile) { this.error.set(this.t('missingCredentials')); return; }
+    if(this.desktop && this.remember && !await this.saveProfile())return;
     this.connecting.set(true);
     const version = this.version;
     try {
       const response = await firstValueFrom(this.http.post<ConnectVpnResponse>('/api/sophos/connect', {
         profile: this.profile, username: this.username, password: this.password, otp: { ...this.config }
       }));
-      if (version === this.version) this.notice.set(response.message);
+      if (version === this.version) this.notice.set(this.t('submitted'));
     } catch (error) {
       if (version !== this.version) return;
       const message = error instanceof HttpErrorResponse ? error.error?.message : '';
-      this.error.set(typeof message === 'string' ? message : 'Sophos’a ulaşılamadı. Backend’i kontrol et.');
+      this.error.set(this.language()==='en' && typeof message==='string' && message ? message : this.t('requestFailed'));
     } finally { this.connecting.set(false); }
   }
   async copy() {
     if (!this.result() || !this.remaining() || this.busy()) return;
-    try { await navigator.clipboard.writeText(this.result()!.code); this.notice.set('Kod panoya kopyalandı.'); }
-    catch { this.error.set('Panoya erişilemedi. Kodu elle kopyalayabilirsiniz.'); }
+    try { await navigator.clipboard.writeText(this.result()!.code); this.notice.set(this.t('copied')); }
+    catch { this.error.set(this.t('copyFailed')); }
   }
   async readQr(event: Event) {
     const field = event.target as HTMLInputElement;
     const file = field.files?.[0]; if (!file) return;
     this.error.set(''); this.notice.set('');
-    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { this.error.set('En fazla 10 MB boyutunda bir QR görseli seçin.'); field.value = ''; return; }
+    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { this.error.set(this.t('qrSize')); field.value = ''; return; }
+    const qrVersion=this.version;
     this.qrBusy.set(true);
     const url = URL.createObjectURL(file);
     try {
       const { BrowserQRCodeReader } = await import('@zxing/browser');
       const text = (await new BrowserQRCodeReader().decodeFromImageUrl(url)).getText();
       if (!text.startsWith('otpauth://totp/')) throw new Error();
-      this.input = text; this.notice.set('QR okundu. Kodu üret düğmesine basabilirsiniz.');
-    } catch { this.error.set('TOTP QR kodu okunamadı. Daha net bir görsel veya Base32 anahtarı kullanın.'); }
+      if(qrVersion!==this.version)return;
+      this.input = text; this.notice.set(this.t('qrReady'));
+    } catch { this.error.set(this.t('qrInvalid')); }
     finally { URL.revokeObjectURL(url); field.value = ''; this.qrBusy.set(false); }
   }
   ngOnDestroy() { clearInterval(this.timer); this.forget(); }
 }
-

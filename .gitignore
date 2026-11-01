@@ -15,3 +15,10 @@ coverage/
 Thumbs.db
 
 dist-test/
+
+release/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.electron-cache/

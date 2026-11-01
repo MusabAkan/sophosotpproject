@@ -18,7 +18,7 @@ test('pass username and password plus fresh OTP as separate arguments', async ()
 test('reject unknown profile without attempting connection', async () => {
   const calls: string[][] = [];
   const service = new SophosService(async (_file,args) => { calls.push(args); return output; }, 'mock-sccli.exe', () => 45000);
-  await assert.rejects(service.connect({...request(),profile:'not-installed'}), /bulunamadı/);
+  await assert.rejects(service.connect({...request(),profile:'not-installed'}), /not found/);
   assert.deepEqual(calls,[['list']]);
 });
 test('validate credentials and OTP before invoking CLI', async () => {
@@ -32,7 +32,7 @@ test('validate credentials and OTP before invoking CLI', async () => {
 test('do not submit an almost expired token', async () => {
   const calls: string[][] = [];
   const service = new SophosService(async (_file,args) => { calls.push(args); return output; },'mock-sccli.exe',()=>59000);
-  await assert.rejects(service.connect(request()), /bitmek üzere/);
+  await assert.rejects(service.connect(request()), /about to expire/);
   assert.deepEqual(calls,[['list']]);
 });
 test('never return process errors containing password arguments', async () => {
@@ -46,7 +46,7 @@ test('do not issue concurrent connect commands and release lock after failure', 
   const service = new SophosService(run,'mock-sccli.exe',()=>45000);
   const first = service.connect(request());
   await new Promise(resolve => setImmediate(resolve));
-  await assert.rejects(service.connect(request()),/zaten/);
+  await assert.rejects(service.connect(request()),/already/);
   release(''); await first;
   assert.equal(enables,1);
 });

@@ -1,164 +1,150 @@
 # Sophos OTP
 
-### Doğrulama kodunu bilgisayarında üret, Sophos bağlantını tek yerden başlat.
+### Your verification code and Sophos connection, ready on your desktop.
 
-Sophos OTP, VPN’e bağlanırken telefondan doğrulama kodu alıp şifrenin sonuna ekleme işini kolaylaştıran bir masaüstü yardımcısıdır. Bilgisayarında çalışır; arayüzünü tarayıcıdan açarsın.
+Sophos OTP generates time-based verification codes on your computer. Add your account with a QR image or Base32 secret, then copy a code or send your username and **current password + OTP** to Sophos Connect.
 
-Kendi hesabına ait QR kodunu veya kurulum anahtarını tanıttığında güncel doğrulama kodunu üretir. Kodu kopyalayıp elle giriş yapabilir ya da kullanıcı adını ve mevcut şifreni girerek Sophos Connect’e tek düğmeyle bağlantı isteği gönderebilirsin.
+The Windows application includes its own runtime and embedded SQLite database. **Customers do not need to install Node.js, npm or SQLite.**
 
-**Angular 21 · PrimeNG 21 · NestJS · TypeScript**
+**Angular 21 · PrimeNG 21 · NestJS · TypeScript · Electron · Embedded SQLite**
 
-> Bu proje bağımsız bir yardımcı uygulamadır. Sophos tarafından geliştirilmemiştir.
+> An independent utility, not an official Sophos product.
 
----
+## Download and run
 
-[Ne işe yarar?](#ne-işe-yarar) · [Nasıl çalışır?](#nasıl-çalışır) · [Kurulum](#kurulum) · [Kullanım](#kullanım) · [Gizlilik](#gizlilik-ve-giriş-bilgileri) · [Geliştiriciler](#geliştiriciler-için)
+1. Open this repository's **Releases** page.
+2. Download the `Sophos-OTP-<version>-Windows-x64.exe` asset from a published release.
+3. Run it on Windows. No database setup or terminal commands are needed.
 
-## Ne işe yarar?
+GitHub's **Source code** ZIP contains developer sources, not the executable. If no executable has been published yet, a maintainer must build or publish the first release using the steps below. Builds are unsigned unless a maintainer configures code signing.
 
-Sophos girişinde bazen yalnızca şifre yetmez; telefondaki doğrulama uygulamasının ürettiği kısa süreli kodu da kullanman gerekir. Bu proje, aynı kurulum bilgileriyle kodu bilgisayarında üretmeni ve giriş sırasında kullanmanı sağlar.
+Sophos Connect must already be installed and configured for the VPN connection feature. Code generation and copying work without Sophos Connect.
 
-| Özellik | Sana ne sağlar? |
+## What can it do?
+
+| Feature | Benefit |
 | --- | --- |
-| QR görseliyle kurulum | Sophos portalındaki QR ekran görüntüsünü seçerek hesabını tanıtırsın. |
-| Manuel anahtar girişi | QR yerine Base32 anahtarını veya `otpauth://totp/` adresini kullanabilirsin. |
-| Canlı kod ve geri sayım | Güncel kodu ve yenilenmesine kalan süreyi görürsün. |
-| Tek tıklamayla kopyalama | Yalnızca kodu, kullanıcı adını veya şifre + kod birleşimini kopyalarsın. |
-| Sophos Connect bağlantısı | Kullanıcı adı ve şifre + OTP ile bağlantı isteği gönderirsin. |
-| Oturumu temizleme | Uygulamadaki kurulum anahtarını ve giriş alanlarını temizlersin. |
+| QR or manual setup | Import a QR screenshot, Base32 secret or `otpauth://totp/` address. |
+| Live code and countdown | See the current code and remaining validity. |
+| Copy actions | Copy a code, username or password combined with OTP. |
+| Sophos Connect integration | Submit a connection request using the installed CLI. |
+| Encrypted local profile | Remember OTP settings, language, connection name and credentials. |
+| Restore on next launch | Avoid entering the same details repeatedly. VPN sign-in still requires a click. |
+| Multiple languages | Turkish by default, plus English, German, French and Spanish, with flag icons. |
+| Glass-style interface | A dark interface with translucent panels. |
 
-Arayüz, koyu renkler ve yarı saydam panellerle hazırlanmış cam efektli bir tasarıma sahiptir.
+## First-time setup
 
-## Nasıl çalışır?
+### 1. Add your OTP account
 
-**OTP**, girişte kullanılan tek kullanımlık doğrulama kodudur. Bu uygulamanın desteklediği **TOTP** yönteminde kod, gizli kurulum anahtarı ve geçerli zaman kullanılarak hesaplanır.
+Choose your Sophos portal's QR image or enter the **OTP setup secret**. This field is not your account password.
 
-Uygulama telefondaki kodu okumaz. Aynı anahtar, algoritma, süre ve hane ayarlarıyla kodu yerelde hesaplar. Bu yüzden bilgisayarın saatinin doğru olması gerekir.
+For manual setup, match your account's algorithm, code length and period. A TOTP QR address supplies these settings automatically. Supported options: SHA1, SHA256 and SHA512; 6 or 8 digits; a 10–300 second period.
 
-Giriş akışı şöyledir:
+Select **Generate code** and compare the first code with your current authenticator. Keep your device clock synchronized.
 
-1. QR kodunu veya kurulum anahtarını tanıtırsın.
-2. Uygulama güncel OTP kodunu üretir ve süresi dolunca yeniler.
-3. **Sophos’a bağlan** düğmesine bastığında mevcut şifrenin sonuna güncel kod eklenir.
-4. Yerel backend bu bilgileri Sophos Connect’in `sccli.exe` aracına iletir.
-5. Bağlantı durumunu Sophos Connect ekranından kontrol edersin.
+### 2. Enter connection details
 
-**Şifre alanına yalnızca mevcut şifreni girmen yeterli. OTP’yi uygulama ekler.**
+Type the connection name yourself, then enter your username and **current password without an OTP**. Names are not automatically listed; only a profile that you explicitly save can be restored.
 
-## Kimler için uygun?
+For VPN profiles expecting an OTP appended to the password, **Connect to Sophos** adds a fresh code and submits the combined value. Check the actual VPN status in Sophos Connect. A submitted request does not mean the VPN has connected.
 
-Kendi Sophos hesabında TOTP kullanan ve doğrulama işlemini bilgisayardan yapmak isteyen kullanıcılar için hazırlanmıştır.
+SSO and profiles with a separate OTP field may need a different sign-in method. The application does not disconnect an existing VPN or sign in automatically.
 
-Otomatik bağlantı özelliği, şifrenin sonuna OTP eklenmesini bekleyen Windows Sophos Connect profilleriyle kullanılabilir. SSO veya ayrı bir OTP alanı kullanan profillerde bu giriş yöntemi uygun olmayabilir.
+### 3. Save once, restore next time
 
-Yalnızca kod üretmek ve kopyalamak için Sophos Connect kurulumu gerekmez. Kurum hesabında kullanmadan önce kurumunun masaüstünde OTP kullanımına izin verdiğinden emin ol.
+Keep **Remember on this device** enabled and select **Save encrypted profile** after entering your details. With remembering enabled, generating a code and requesting a connection also save the current profile.
 
-## Kurulum
+On the next launch under the same Windows account, saved settings and credentials are restored.
 
-### Gereksinimler
+- **Clear session** clears the current screen and memory references, keeping the saved profile.
+- **Delete saved profile** removes the stored profile and clears the current session.
+- Disabling **Remember on this device** stops automatic saves; use **Delete saved profile** to remove an existing record.
 
-- **Node.js 24 LTS** ve npm.
-- Kendi hesabına ait TOTP QR kodu veya kurulum anahtarı.
-- Otomatik VPN bağlantısı için Windows ve yapılandırılmış Sophos Connect.
+Regular browser development sessions are temporary. Encrypted persistence is available in the desktop application.
 
-### Başlatma
+## Local storage and privacy
 
-Projeyi indirip ana klasöründe terminal aç:
+SQLite is part of the bundled runtime. An application-specific `profiles.sqlite` file is created in the current user's application-data directory, outside the executable folder and source repository.
+
+The entire saved profile is encrypted with Electron's Windows OS encryption provider before it is written to SQLite. If encryption is unavailable, saving fails instead of using plaintext. Saved credentials are tied to the Windows account that encrypted them.
+
+QR images are read in the UI and are not stored. OTP generation is local. The packaged API listens only on loopback, uses a dynamic port and requires a per-launch session token. There is no cloud synchronization.
+
+Important boundaries:
+
+- Windows account encryption does not protect against malicious software running as that same user.
+- Sophos CLI temporarily receives password + OTP as process arguments.
+- Copying places sensitive values on the system clipboard. Clearing a session does not clear it.
+- Clearing memory references is not guaranteed physical erasure. Deleting a profile does not remove filesystem backups.
+
+Follow your organization's OTP policy. Never commit actual QR codes, secrets, credentials, connection addresses or private screenshots.
+
+## For developers
+
+Only developers need **Node.js 24 LTS** and npm.
 
 ```sh
 npm ci
-npm run dev
+node node_modules/electron/install.js
+npm test
+npm run desktop:dev
 ```
 
-Ardından tarayıcıda **http://127.0.0.1:4200** adresini aç.
+Run commands from the repository root; this project uses npm workspaces.
 
-Windows’ta alternatif olarak **BASLAT.cmd** dosyasını çalıştırabilirsin. Başlatıcı, bağımlılıklar henüz kurulmadıysa ilk kurulumu yapar. İlk kurulum internet bağlantısı gerektirir.
-
-Backend ve frontend aynı terminalde çalışır. Durdurmak için `Ctrl+C` kullan.
-
-## Kullanım
-
-### 1. Hesabını tanıt
-
-Sophos kullanıcı portalındaki TOTP QR görselini seç veya **Base32 kurulum anahtarını** ilgili alana gir. Bu alan hesabının şifresi için değildir.
-
-Manuel anahtar kullanıyorsan algoritma, süre ve hane ayarlarını Sophos ayarlarınla eşleştir. TOTP adresi içeren QR kodu seçildiğinde bu bilgiler adresten alınır.
-
-### 2. Kodu üret
-
-**Kodu üret** düğmesine bas. İlk kullanımda ekrandaki kodu telefonundaki doğrulayıcıyla karşılaştır. Kodlar eşleştiğinde giriş için kullanabilirsin.
-
-Desteklenen ayarlar: **SHA1, SHA256, SHA512**; **6 veya 8 hane**; **10–300 saniye** yenileme aralığı.
-
-### 3. Giriş yöntemini seç
-
-**Elle giriş:** **Kodu kopyala** düğmesiyle kodu alıp normal Sophos girişinde kullan. İstersen kullanıcı adını ve **şifre + OTP** birleşimini ayrı düğmelerle de kopyalayabilirsin.
-
-**Uygulamadan bağlantı:**
-
-1. Sophos Connect’teki bağlantı adını boş metin alanına kendin yaz.
-2. Kullanıcı adını ve mevcut şifreni gir; şifreye OTP ekleme.
-3. **Sophos’a bağlan** düğmesine bas.
-4. Sonucu Sophos Connect ekranından kontrol et.
-
-Bağlantı adları otomatik listelenmez veya doldurulmaz. Kodun son 5 saniyesinde uygulama yeni kodu beklemeni ister. Bağlantı isteğinin gönderilmesi, VPN bağlantısının tamamlandığı anlamına gelmez.
-
-### 4. İşin bitince oturumu temizle
-
-**Oturumu temizle**, uygulamadaki anahtarı, kullanıcı adını, şifreyi ve bağlantı alanını temizler. Sekmeyi kapattığında bilgileri yeniden girmen gerekir.
-
-## Gizlilik ve giriş bilgileri
-
-Uygulama bilgilerini kalıcı olarak saklamaz; kullanım sırasında açık sekmenin belleğinde tutar.
-
-| Bilgi | Nasıl işlenir? |
+| Command | Purpose |
 | --- | --- |
-| QR görseli | Tarayıcıda okunur; görsel backend’e yüklenmez. |
-| OTP kurulum anahtarı | Kod hesaplamak için yerel backend’e gönderilir; diske kaydedilmez. |
-| Kullanıcı adı ve şifre | Bağlantı düğmesine bastığında yerel backend üzerinden Sophos komut aracına aktarılır. |
-| Kopyalanan değerler | Sistem panosuna yazılır. Oturumu temizlemek panoyu temizlemez. |
+| `npm run dev` | Browser development UI at http://127.0.0.1:4200 and local backend. |
+| `npm run build` | Build the Angular UI and NestJS API. |
+| `npm test` | Run OTP, CLI, API, translation and SQLite tests. |
+| `npm run test:electron` | Test the built desktop UI and real Windows encryption in a temporary profile. |
+| `npm run desktop:dev` | Build and open the desktop application. |
+| `npm run dist:win` | Build a standalone Windows x64 executable in `release/`. |
 
-Backend yalnızca `127.0.0.1` üzerinde dinler. Giriş bilgileri dosyaya, veritabanına veya `localStorage` içine kaydedilmez; istek gövdeleri loglanmaz.
+Windows developers can use `START-DEV.cmd` for browser development. Backend source changes require restarting the development command.
 
-**Bilmen gereken sınır:** Sophos’un komut aracı şifreyi argüman olarak aldığı için şifre + OTP, aktarım sırasında kısa süreliğine Windows süreç komut satırında bulunabilir. JavaScript belleğindeki bütün kopyaların fiziksel olarak silinmesi de garanti edilmez.
+### Project structure
 
-Gerçek QR kodlarını, kurulum anahtarlarını, şifreleri, bağlantı adreslerini veya kişisel ekran görüntülerini GitHub’a yükleme.
-
-## Geliştiriciler için
-
-### Teknolojiler ve klasörler
-
-| Klasör | İçerik |
+| Folder | Responsibility |
 | --- | --- |
-| `frontend/` | Angular 21 ve PrimeNG 21 ile kullanıcı arayüzü |
-| `backend/` | NestJS API, Node.js kripto modülüyle TOTP üretimi ve Sophos komut aktarımı |
-| `shared/` | İki uygulamanın kullandığı ortak TypeScript API tipleri |
-| `BASLAT.cmd` | Windows başlatıcısı |
+| `frontend/` | Angular + PrimeNG UI and language dictionaries. |
+| `backend/` | NestJS API, TOTP calculation and Sophos CLI integration. |
+| `shared/` | Shared TypeScript contracts. |
+| `desktop/` | Electron shell, restricted IPC and encrypted SQLite vault. |
+| `.github/workflows/` | Windows testing, packaging and tagged releases. |
 
-Proje **npm workspaces** kullanır. Kurulum ve komutları ana klasörden çalıştır.
+The desktop renderer uses context isolation, a sandbox and disabled Node integration. Profile operations are restricted to the application's own main frame.
 
-### Komutlar
+### Tests
+
+Coverage includes RFC 6238 vectors, invalid inputs, expiry boundaries, CLI argument handling without a shell, concurrent requests, sanitized errors, API token/origin/host checks, complete translations, encrypted storage, restart restoration, deletion and encryption failures.
+
+Unit tests use synthetic credentials and a test encryption adapter. The Electron smoke test uses a separate temporary profile and the real Windows encryption provider. Tests do not connect to a customer's VPN.
+
+## Publishing a runnable GitHub release
+
+The Windows workflow runs tests and creates an executable for pushes and pull requests. Download it from the workflow's **Artifacts** section.
+
+To publish a release, a maintainer pushes a version tag matching `package.json`:
 
 ```sh
-npm run dev     # Backend ve frontend'i başlat
-npm run build   # İki uygulamayı derle
-npm test        # OTP ve Sophos komut aktarımı testlerini çalıştır
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
-Frontend `4200`, backend `3000` portunu kullanır. Frontend geliştirme sunucusu `/api` isteklerini yerel backend’e yönlendirir.
+After tests, the production build and the desktop smoke test pass, the workflow attaches the executable to that GitHub release. Customers download the executable, not the source ZIP.
 
-Derleme çıktıları `frontend/dist/browser/` ve `backend/dist/` altındadır. Backend geliştirme komutu başlangıçta TypeScript’i derler; backend kaynaklarını değiştirdiğinde geliştirme sürecini yeniden başlat.
+Generated packages, local databases and environment files are excluded from source control.
 
-Testler RFC 6238 örneklerini, geçersiz girişleri, kod süresini, profil doğrulamasını ve Sophos komutuna bilgi aktarımını kapsar. Bağlantı testleri sahte komut çalıştırıcısı kullanır; gerçek VPN bağlantısı açmaz.
+## Troubleshooting
 
-## Sık karşılaşılan durumlar
-
-| Durum | Ne yapabilirsin? |
+| Problem | Check |
 | --- | --- |
-| Telefonda ve bilgisayarda kodlar farklı | Saati otomatik eşitle; algoritma, süre ve hane ayarlarını karşılaştır. |
-| Sophos komut aracı bulunamıyor | Sophos Connect’in standart Windows kurulumunu ve servisinin çalıştığını kontrol et. |
-| Bağlantı adı bulunamıyor | Sophos Connect’te görünen bağlantı adını eksiksiz yaz. |
-| Backend’e ulaşılamıyor | Geliştirme terminalini ve 3000/4200 portlarını kontrol et. |
-| Değişiklikler görünmüyor | Başlatıcıyı yeniden çalıştırıp sayfayı yenile. |
+| Codes differ from the phone | System time, setup secret, algorithm, period and digits. |
+| Sophos CLI is unavailable | Standard Windows installation and the Sophos Connect service. |
+| Connection is not found | Exact connection name in Sophos Connect. |
+| Saved profile cannot be decrypted | Use the original Windows account or delete and recreate the profile. |
+| Settings are not restored in a browser | Use the desktop application for encrypted persistence. |
 
-Bu proje yerel kullanım için hazırlanmıştır. İnternete açık barındırma veya çok kullanıcılı bir servis için kimlik doğrulama yapılandırması içermez.
+This is a local desktop utility, not a public web service. Windows x64 is the configured release target.

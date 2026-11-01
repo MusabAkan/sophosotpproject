@@ -1,0 +1,34 @@
+{
+  "appId": "io.sophosotp.desktop",
+  "productName": "Sophos OTP",
+  "asar": true,
+  "npmRebuild": false,
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "desktop/main.cjs",
+    "desktop/preload.cjs",
+    "desktop/vault.cjs",
+    "backend/dist/**/*",
+    "frontend/dist/browser/**/*",
+    "package.json",
+    "!**/*.map",
+    "!**/test/**"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "artifactName": "Sophos-OTP-${version}-Windows-${arch}.${ext}",
+    "signAndEditExecutable": false
+  },
+  "portable": {
+    "requestExecutionLevel": "user"
+  }
+}
