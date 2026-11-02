@@ -60,6 +60,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.pendingSwitch.set(null);await this.switchProfile(target.id);
   }
   private resetFields(){
+    this.hideCredentials();
     this.clear();this.input='';this.profileName='';this.username='';this.password='';this.profile='';
     this.algorithm='SHA1';this.period=30;this.digits=6;this.revision=undefined;
     this.error.set('');this.confirmDelete.set(false);
@@ -113,6 +114,39 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly displayCode = computed(() => { const value = this.result()?.code; return value ? value.slice(0,value.length / 2) + ' ' + value.slice(value.length / 2) : '••• •••'; });
   private config: GenerateOtpRequest | null = null;
   username = ''; password = ''; profile = '';
+  readonly connectionVisible = signal(false);
+  readonly usernameVisible = signal(false);
+  readonly passwordVisible = signal(false);
+
+  credentialsLocked(): boolean {
+    return this.saving() || this.restoring() || this.connecting() || !!this.pendingSwitch();
+  }
+
+  toggleConnectionVisibility(): void {
+    if (!this.credentialsLocked()) {
+      this.connectionVisible.update(visible => !visible);
+    }
+  }
+
+  togglePasswordVisibility(): void {
+    if (!this.credentialsLocked()) {
+      this.passwordVisible.update(visible => !visible);
+    }
+  }
+
+  toggleUsernameVisibility(): void {
+    if (!this.credentialsLocked()) {
+      this.usernameVisible.update(visible => !visible);
+    }
+  }
+
+  private hideCredentials(): void {
+    // Visibility belongs to the current screen, never to a saved profile.
+    this.connectionVisible.set(false);
+    this.usernameVisible.set(false);
+    this.passwordVisible.set(false);
+  }
+
   readonly sophos = signal<SophosInfo | null>(null);
   readonly infoBusy = signal(false); readonly connecting = signal(false);
   private version = 0; private offset = 0;

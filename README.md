@@ -47,6 +47,8 @@ Sophos Connect must be installed and configured to use the VPN connection button
 
 Saving is explicit. The optional **Save changes when connecting** checkbox also saves the current form when you press Connect. Clearing the current session keeps saved profiles. Deleting a saved profile requires its own confirmation.
 
+Connection names, usernames and passwords are hidden by default. Use the eye button beside each field to show or hide it independently. Switching profiles, clearing the session or reopening the app hides all three fields again. These buttons only change screen visibility; saved profiles always remain encrypted.
+
 ## One local encrypted store
 
 The browser interface, packaged desktop app and CLI share the same SQLite file when run under the same Windows account:
@@ -56,6 +58,8 @@ The browser interface, packaged desktop app and CLI share the same SQLite file w
 This fixes the earlier behavior where browser sessions could not save profiles. The local API now handles persistence in both modes; installing a separate database service is unnecessary.
 
 Profile names, credentials and OTP secrets are encrypted with Windows DPAPI before they reach SQLite. There is no plaintext fallback when Windows encryption is unavailable. Encryption uses the current Windows account, not an app-specific master password. Other programs running as the same Windows user are outside this protection boundary. Copying the database alone is not a portable export to another account or computer.
+
+Bcrypt is a one-way password hash used to verify passwords. This app needs to recover saved credentials for autofill and Sophos sign-in, so it uses reversible Windows account encryption instead. Usernames, connection names, passwords and OTP secrets are stored together in an encrypted payload; they are not plaintext database columns.
 
 Existing single-profile databases are preserved and migrated by the desktop app. If a legacy profile cannot be decrypted, the original encrypted record is retained and the app displays an import notice. Open the updated desktop app once under the Windows account that created that record.
 

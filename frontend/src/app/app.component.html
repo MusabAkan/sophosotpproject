@@ -22,7 +22,97 @@
 <p-button type="submit" [label]="t('generate')" icon="pi pi-arrow-right" iconPos="right" [loading]="busy()" [disabled]="sessionBusy() || !!pendingSwitch()" styleClass="generate-button" /></form><div class="privacy"><i class="pi pi-lock"></i><span>{{t('privacy')}}</span></div></section>
 <section class="glass token-panel"><div class="token-top"><span class="eyebrow">{{t('tokenTitle')}}</span><span class="token-status" [class.connected]="active()"><span></span>{{t(active()?'active':'waiting')}}</span></div><div class="token-content"><div class="shield-emblem"><i class="pi pi-shield"></i><span class="emblem-dot"></span></div><h2>{{profileName || t('account')}}</h2><p>{{t(active()?'ready':'setupPrompt')}}</p><div class="otp-code" [class.is-empty]="!active()" [attr.aria-label]="t('tokenTitle')">{{displayCode()}}</div><div class="countdown"><span>{{t(active()?'until':'autoRenew')}}</span><strong>{{active()?remaining()+' '+t('seconds'):'—'}}</strong></div><p-progressbar [value]="progress()" [showValue]="false" /><p-button [label]="t('copy')" icon="pi pi-copy" (onClick)="copy()" [disabled]="!active() || remaining()===0 || busy()" styleClass="copy-button" /><button class="forget" type="button" (click)="forget()" [disabled]="sessionBusy() || !!pendingSwitch()"><i class="pi pi-sign-out"></i>{{t('clear')}}</button></div><div class="token-foot"><i class="pi pi-sync"></i>{{t('clock')}}</div></section></div>
 <section class="glass connection-panel"><div class="panel-heading"><span class="step">02</span><div><h2>{{t('connectionTitle')}}</h2><p>{{t('connectionSub')}}</p></div><p-button icon="pi pi-refresh" severity="secondary" [text]="true" [ariaLabel]="t('refresh')" [loading]="infoBusy()" [disabled]="connecting()" (onClick)="loadSophos()" /></div>
-<form (ngSubmit)="connectVpn()" autocomplete="off"><div class="connection-fields"><div><label for="vpn-profile">{{t('profile')}}</label><input pInputText id="vpn-profile" name="profile" [(ngModel)]="profile" [placeholder]="t('profilePlaceholder')" autocomplete="off" spellcheck="false" [disabled]="connecting() || restoring() || saving() || !!pendingSwitch()" /></div><div><label for="vpn-username">{{t('username')}}</label><input pInputText id="vpn-username" name="vpnUsername" [(ngModel)]="username" autocomplete="off" autocapitalize="none" spellcheck="false" [disabled]="connecting() || restoring() || saving() || !!pendingSwitch()" [placeholder]="t('username')" /></div><div><label for="vpn-password">{{t('password')}}</label><input pInputText type="password" id="vpn-password" name="vpnPassword" [(ngModel)]="password" autocomplete="off" [disabled]="connecting() || restoring() || saving() || !!pendingSwitch()" [placeholder]="t('passwordPlaceholder')" /></div></div>
+<form (ngSubmit)="connectVpn()" autocomplete="off">
+  <div class="connection-fields">
+    <div>
+      <label for="vpn-profile">{{ t('profile') }}</label>
+      <div class="credential-field">
+        <input
+          pInputText
+          id="vpn-profile"
+          name="profile"
+          [type]="connectionVisible() ? 'text' : 'password'"
+          [(ngModel)]="profile"
+          [placeholder]="t('profilePlaceholder')"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          [disabled]="credentialsLocked()"
+        />
+        <button
+          type="button"
+          class="visibility-toggle"
+          aria-controls="vpn-profile"
+          [attr.aria-label]="t(connectionVisible() ? 'hideConnection' : 'showConnection')"
+          [attr.aria-pressed]="connectionVisible()"
+          [title]="t(connectionVisible() ? 'hideConnection' : 'showConnection')"
+          [disabled]="credentialsLocked()"
+          (click)="toggleConnectionVisibility()"
+        >
+          <i class="pi" [class.pi-eye]="!connectionVisible()" [class.pi-eye-slash]="connectionVisible()" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div>
+      <label for="vpn-username">{{ t('username') }}</label>
+      <div class="credential-field">
+        <input
+          pInputText
+          id="vpn-username"
+          name="vpnUsername"
+          [type]="usernameVisible() ? 'text' : 'password'"
+          [(ngModel)]="username"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          [disabled]="credentialsLocked()"
+          [placeholder]="t('username')"
+        />
+        <button
+          type="button"
+          class="visibility-toggle"
+          aria-controls="vpn-username"
+          [attr.aria-label]="t(usernameVisible() ? 'hideUsername' : 'showUsername')"
+          [attr.aria-pressed]="usernameVisible()"
+          [title]="t(usernameVisible() ? 'hideUsername' : 'showUsername')"
+          [disabled]="credentialsLocked()"
+          (click)="toggleUsernameVisibility()"
+        >
+          <i class="pi" [class.pi-eye]="!usernameVisible()" [class.pi-eye-slash]="usernameVisible()" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div>
+      <label for="vpn-password">{{ t('password') }}</label>
+      <div class="credential-field">
+        <input
+          pInputText
+          id="vpn-password"
+          name="vpnPassword"
+          [type]="passwordVisible() ? 'text' : 'password'"
+          [(ngModel)]="password"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          [disabled]="credentialsLocked()"
+          [placeholder]="t('passwordPlaceholder')"
+        />
+        <button
+          type="button"
+          class="visibility-toggle"
+          aria-controls="vpn-password"
+          [attr.aria-label]="t(passwordVisible() ? 'hidePassword' : 'showPassword')"
+          [attr.aria-pressed]="passwordVisible()"
+          [title]="t(passwordVisible() ? 'hidePassword' : 'showPassword')"
+          [disabled]="credentialsLocked()"
+          (click)="togglePasswordVisibility()"
+        >
+          <i class="pi" [class.pi-eye]="!passwordVisible()" [class.pi-eye-slash]="passwordVisible()" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <p class="connection-hint">{{ t('visibilityHint') }}</p>
 <div class="connection-actions"><p-button type="submit" [label]="t('connect')" icon="pi pi-sign-in" [loading]="connecting()" [disabled]="!active() || !sophos()?.available || !profile || !username.trim() || !password || remaining()<=5 || infoBusy() || sessionBusy() || !!pendingSwitch()" styleClass="generate-button" /><p-button type="button" [label]="t('copyUser')" icon="pi pi-user" severity="secondary" [outlined]="true" [disabled]="!username" (onClick)="copyUsername()" /><p-button type="button" [label]="t('copyCombined')" icon="pi pi-copy" severity="secondary" [outlined]="true" [disabled]="!active() || !password || remaining()<=5 || busy()" (onClick)="copyCombined()" /></div></form>
 <p class="connection-hint">{{t('connectionHint')}}</p>@if(sophos() && !sophos()!.available){<p class="connection-hint">{{t('cliUnavailable')}}</p>}
 
