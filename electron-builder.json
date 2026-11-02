@@ -14,12 +14,19 @@
     "frontend/dist/browser/**/*",
     "package.json",
     "!**/*.map",
-    "!**/test/**"
+    "!**/test/**",
+    "cli/*.cjs"
   ],
   "win": {
     "target": [
       {
         "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "zip",
         "arch": [
           "x64"
         ]
@@ -30,5 +37,11 @@
   },
   "portable": {
     "requestExecutionLevel": "user"
-  }
+  },
+  "extraFiles": [
+    {
+      "from": "desktop/Sophos-OTP-CLI.cmd",
+      "to": "Sophos-OTP-CLI.cmd"
+    }
+  ]
 }

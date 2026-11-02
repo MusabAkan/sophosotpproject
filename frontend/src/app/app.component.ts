@@ -8,7 +8,7 @@ import { SelectModule } from 'primeng/select';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { MessageModule } from 'primeng/message';
-import type { GenerateOtpRequest, GenerateOtpResponse, OtpAlgorithm, SophosInfo, ConnectVpnResponse, AppLanguage } from '../../../shared/src';
+import type { GenerateOtpRequest, GenerateOtpResponse, OtpAlgorithm, SophosInfo, ConnectVpnResponse, AppLanguage, SavedProfile, ProfileCatalog, ProfileInput } from '../../../shared/src';
 
 import {translate,languages,DEFAULT_LANGUAGE,type MessageKey} from './i18n';
 
@@ -17,32 +17,92 @@ import {translate,languages,DEFAULT_LANGUAGE,type MessageKey} from './i18n';
   templateUrl: './app.component.html' })
 export class AppComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
-  readonly desktop = window.sophosDesktop;
-  readonly languages = languages;
-  readonly language = signal<AppLanguage>(DEFAULT_LANGUAGE);
-  readonly saving = signal(false); readonly restoring = signal(false);
-  remember = true;
-  t(key: MessageKey) { return translate(this.language(),key); }
-  setLanguage(value: AppLanguage) { this.language.set(value); document.documentElement.lang=value; if(this.desktop && this.config && this.remember)void this.saveProfile(); }
-  async saveProfile() {
-    if(!this.desktop || !this.config || this.saving())return false;
-    this.saving.set(true);
-    try { await this.desktop.save({version:1,language:this.language(),profile:this.profile,username:this.username,password:this.password,otp:{...this.config}}); this.notice.set(this.t('saved')); return true; }
-    catch {this.error.set(this.t('saveFailed'));return false;}finally{this.saving.set(false);}
+
+  readonly languages=languages;
+  readonly language=signal<AppLanguage>(DEFAULT_LANGUAGE);
+  readonly saving=signal(false);readonly restoring=signal(false);
+  readonly catalog=signal<ProfileCatalog>({profiles:[],selectedId:null,legacyPending:false});
+  readonly selectedId=signal<string|null>(null);readonly profileChoice=signal<string|null>(null);
+  readonly pendingSwitch=signal<{id:string|null}|null>(null);readonly confirmDelete=signal(false);
+  readonly storageReady=signal(false);
+  profileName='';remember=true;
+  private revision:number|undefined;private baseline='';private destroyed=false;
+  t(key:MessageKey){return translate(this.language(),key);}
+  setLanguage(value:AppLanguage){this.language.set(value);document.documentElement.lang=value;}
+  profileOptions(){return this.catalog().profiles.map(profile=>({...profile,label:profile.readable?profile.name:this.t('unreadableProfile')}));}
+  sessionBusy(){return this.saving()||this.restoring()||this.connecting()||this.qrBusy()||this.busy();}
+  private snapshot(){return JSON.stringify({name:this.profileName,profile:this.profile,username:this.username,password:this.password,otp:this.config,input:this.input,algorithm:this.algorithm,period:this.period,digits:this.digits,language:this.language()});}
+  dirty(){return !!this.baseline&&this.snapshot()!==this.baseline;}
+  private markClean(){this.baseline=this.snapshot();}
+  private profileError(error:unknown,fallback:MessageKey){
+    const code=error instanceof HttpErrorResponse?error.error?.code:'';
+    const messages:Record<string,MessageKey>={ENCRYPTION_UNAVAILABLE:'encryptionUnavailable',PROFILE_CONFLICT:'profileConflict',PROFILE_NOT_FOUND:'profileNotFound',DECRYPTION_FAILED:'restoreFailed',INVALID_PROFILE:'invalidProfile'};
+    this.error.set(this.t(messages[code]??fallback));
   }
-  async deleteSaved() {
-    try {await this.desktop?.remove();this.forget();this.notice.set(this.t('deleted'));}
-    catch {this.error.set(this.t('deletionFailed'));}
+  private async refreshProfiles(){this.catalog.set(await firstValueFrom(this.http.get<ProfileCatalog>('/api/profiles')));this.storageReady.set(true);}
+  private async restoreProfiles(){
+    this.markClean();this.restoring.set(true);
+    try{await this.refreshProfiles();}catch(error){this.profileError(error,'catalogFailed');}
+    finally{this.restoring.set(false);}
+    if(!this.destroyed&&this.catalog().selectedId)await this.switchProfile(this.catalog().selectedId);
   }
-  private async restoreProfile() {
-    if(!this.desktop)return;
-    this.restoring.set(true);
-    try {const saved=await this.desktop.load();if(!saved)return;
-      this.language.set(saved.language);document.documentElement.lang=saved.language;
-      this.profile=saved.profile;this.username=saved.username;this.password=saved.password;
-      if(saved.otp){this.config={...saved.otp};this.algorithm=saved.otp.algorithm;this.period=saved.otp.period;this.digits=saved.otp.digits;await this.refresh(this.version);}
-      if(this.active())this.notice.set(this.t('restored'));
-    }catch{this.error.set(this.t('restoreFailed'));}finally{this.restoring.set(false);}
+  async requestProfile(id:string|null){
+    if(this.sessionBusy()||this.pendingSwitch())return;
+    if(id!==null&&id===this.selectedId())return;
+    this.profileChoice.set(id);this.confirmDelete.set(false);
+    if(this.dirty()){this.pendingSwitch.set({id});return;}
+    await this.switchProfile(id);
+  }
+  cancelProfileSwitch(){this.pendingSwitch.set(null);this.profileChoice.set(this.selectedId());}
+  async continueProfileSwitch(save:boolean){
+    const target=this.pendingSwitch();if(!target||this.sessionBusy())return;
+    if(save&&!await this.saveProfile())return;
+    this.pendingSwitch.set(null);await this.switchProfile(target.id);
+  }
+  private resetFields(){
+    this.clear();this.input='';this.profileName='';this.username='';this.password='';this.profile='';
+    this.algorithm='SHA1';this.period=30;this.digits=6;this.revision=undefined;
+    this.error.set('');this.confirmDelete.set(false);
+  }
+  private async switchProfile(id:string|null){
+    this.restoring.set(true);this.resetFields();this.selectedId.set(id);this.profileChoice.set(id);
+    const version=this.version;
+    try{
+      if(id){
+        const saved=await firstValueFrom(this.http.post<SavedProfile>('/api/profiles/load',{id}));
+        if(this.destroyed||version!==this.version)return;
+        this.profileName=saved.name;this.revision=saved.revision;this.profile=saved.profile;this.username=saved.username;this.password=saved.password;
+        this.setLanguage(saved.language);
+        if(saved.otp){this.config={...saved.otp};this.algorithm=saved.otp.algorithm;this.period=saved.otp.period;this.digits=saved.otp.digits;await this.refresh(this.version);}
+        if(!this.error())this.notice.set(this.t('restored'));
+      }
+    }catch(error){this.profileError(error,'restoreFailed');}
+    finally{if(!this.destroyed){this.markClean();this.restoring.set(false);}}
+  }
+  async saveProfile(asNew=false){
+    if(this.saving()||this.restoring()||this.connecting()||this.qrBusy()||this.busy())return false;
+    if(!this.profileName.trim()){this.error.set(this.t('nameRequired'));return false;}
+    this.saving.set(true);this.error.set('');this.notice.set('');
+    try{
+      if(this.input.trim()||(this.config&&(this.algorithm!==this.config.algorithm||this.period!==this.config.period||this.digits!==this.config.digits))){if(!await this.start())return false;}
+      const value:ProfileInput={version:2,name:this.profileName,provider:'sophos',language:this.language(),profile:this.profile,username:this.username,password:this.password,otp:this.config?{...this.config}:null,
+        ...(!asNew&&this.selectedId()?{id:this.selectedId()!,revision:this.revision}:{})};
+      const saved=await firstValueFrom(this.http.post<SavedProfile>('/api/profiles/save',value));
+      if(this.destroyed)return false;
+      this.selectedId.set(saved.id);this.profileChoice.set(saved.id);this.revision=saved.revision;this.profileName=saved.name;this.markClean();
+      this.notice.set(this.t('saved'));
+      try{await this.refreshProfiles();}catch{this.error.set(this.t('catalogFailed'));}
+      return true;
+    }catch(error){this.profileError(error,'saveFailed');return false;}finally{this.saving.set(false);}
+  }
+  async deleteSaved(){
+    const id=this.selectedId();if(!id||!this.confirmDelete()||this.sessionBusy())return;
+    this.saving.set(true);this.error.set('');
+    try{
+      await firstValueFrom(this.http.post('/api/profiles/remove',{id}));
+      this.resetFields();this.selectedId.set(null);this.profileChoice.set(null);this.markClean();this.notice.set(this.t('deleted'));
+      await this.refreshProfiles();
+    }catch(error){this.profileError(error,'deletionFailed');}finally{this.saving.set(false);}
   }
   input = ''; algorithm: OtpAlgorithm = 'SHA1'; period = 30; digits: 6 | 8 = 6;
   readonly algorithms = ['SHA1','SHA256','SHA512']; readonly digitOptions = [6,8];
@@ -59,10 +119,11 @@ export class AppComponent implements OnInit, OnDestroy {
   private timer = setInterval(() => this.tick(), 200);
 
   async start() {
-    if (this.busy()) return;
+    if (this.busy() || this.restoring() || this.connecting() || this.qrBusy()) return false;
+    const previous=this.config;
     this.clear(); this.error.set(''); this.notice.set('');
     try {
-      const config: GenerateOtpRequest = { secret: this.input.trim(), algorithm: this.algorithm, period: this.period, digits: this.digits };
+      const config: GenerateOtpRequest = { secret: this.input.trim() || previous?.secret || '', algorithm: this.algorithm, period: this.period, digits: this.digits };
       if (config.secret.startsWith('otpauth://')) {
         const uri = new URL(config.secret);
         if (uri.hostname !== 'totp') throw new Error(this.t('invalidSetup'));
@@ -75,8 +136,9 @@ export class AppComponent implements OnInit, OnDestroy {
       if (!config.secret) throw new Error(this.t('missingSecret'));
       this.config = config;
       await this.refresh(this.version);
-      if (this.active()) { this.input = ''; if(this.desktop && this.remember)await this.saveProfile(); }
+      if (this.active()) { this.algorithm = config.algorithm; this.period = config.period; this.digits = config.digits; this.input = ''; return true; }
     } catch (error) { this.error.set(this.t('invalidSetup')); }
+    return false;
   }
   private async refresh(version: number) {
     if (!this.config || this.busy()) return;
@@ -89,7 +151,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.result.set(result); this.active.set(true); this.error.set(''); this.updateRemaining();
     } catch (error) {
       if (version !== this.version) return;
-      this.result.set(null); this.active.set(false); this.config = null;
+      this.result.set(null); this.active.set(false); if(error instanceof HttpErrorResponse && error.status===400)this.config = null;
       const message = error instanceof HttpErrorResponse ? error.error?.message : '';
       this.error.set(this.language()==='en' && typeof message==='string' && message ? message : this.t('requestFailed'));
     } finally { if (version === this.version) this.busy.set(false); }
@@ -97,8 +159,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private updateRemaining() { const result = this.result(); this.remaining.set(result ? Math.max(0, Math.ceil((result.validUntil - Date.now() - this.offset) / 1000)) : 0); }
   private tick() { this.updateRemaining(); if (this.active() && !this.remaining() && !this.busy()) void this.refresh(this.version); }
   clear() { this.version++; this.config = null; this.result.set(null); this.active.set(false); this.busy.set(false); this.remaining.set(0); this.notice.set(''); this.account.set('Local account'); }
-  forget() { this.clear(); this.input = ''; this.username = ''; this.password = ''; this.profile = ''; this.error.set(''); this.notice.set(this.t('cleared')); }
-  ngOnInit() { void this.loadSophos(); void this.restoreProfile(); }
+  forget() { this.resetFields(); this.selectedId.set(null); this.profileChoice.set(null); this.pendingSwitch.set(null); this.markClean(); this.notice.set(this.t('cleared')); }
+  ngOnInit() { void this.loadSophos(); void this.restoreProfiles(); }
   async loadSophos() {
     if (this.infoBusy()) return;
     this.infoBusy.set(true);
@@ -122,10 +184,10 @@ export class AppComponent implements OnInit, OnDestroy {
     catch { this.error.set(this.t('copyFailed')); }
   }
   async connectVpn() {
-    if (this.connecting() || !this.config || !this.active()) return;
+    if (this.sessionBusy() || this.pendingSwitch() || !this.config || !this.active()) return;
     this.error.set(''); this.notice.set('');
     if (!this.username.trim() || !this.password || !this.profile) { this.error.set(this.t('missingCredentials')); return; }
-    if(this.desktop && this.remember && !await this.saveProfile())return;
+    if(this.remember){if(!this.profileName.trim())this.profileName=this.profile;if(!await this.saveProfile())return;}
     this.connecting.set(true);
     const version = this.version;
     try {
@@ -161,5 +223,5 @@ export class AppComponent implements OnInit, OnDestroy {
     } catch { this.error.set(this.t('qrInvalid')); }
     finally { URL.revokeObjectURL(url); field.value = ''; this.qrBusy.set(false); }
   }
-  ngOnDestroy() { clearInterval(this.timer); this.forget(); }
+  ngOnDestroy() { this.destroyed=true; clearInterval(this.timer); this.forget(); }
 }

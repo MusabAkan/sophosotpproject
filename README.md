@@ -1,150 +1,130 @@
 # Sophos OTP
 
-### Your verification code and Sophos connection, ready on your desktop.
+### Your profiles, verification codes and Sophos connection in one place.
 
-Sophos OTP generates time-based verification codes on your computer. Add your account with a QR image or Base32 secret, then copy a code or send your username and **current password + OTP** to Sophos Connect.
-
-The Windows application includes its own runtime and embedded SQLite database. **Customers do not need to install Node.js, npm or SQLite.**
+Sophos OTP is a local authenticator with a glass-style interface. Import a TOTP QR image or setup secret, save several named accounts, and switch between them without retyping your credentials. A selected profile loads its connection name, username, password and OTP settings; selecting a profile never starts a VPN connection.
 
 **Angular 21 · PrimeNG 21 · NestJS · TypeScript · Electron · Embedded SQLite**
 
-> An independent utility, not an official Sophos product.
+> An independent utility, not an official Sophos product. Sophos Connect is the currently supported VPN client. FortiClient integration is not included.
 
 ## Download and run
 
-1. Open this repository's **Releases** page.
-2. Download the `Sophos-OTP-<version>-Windows-x64.exe` asset from a published release.
-3. Run it on Windows. No database setup or terminal commands are needed.
+Customers do **not** need to install Node.js, npm or SQLite.
 
-GitHub's **Source code** ZIP contains developer sources, not the executable. If no executable has been published yet, a maintainer must build or publish the first release using the steps below. Builds are unsigned unless a maintainer configures code signing.
+| Download | How to use it |
+| --- | --- |
+| Windows x64 EXE | Run the portable desktop application. |
+| Windows x64 ZIP | Extract the complete folder. Run **Sophos OTP.exe**, or use **Sophos-OTP-CLI.cmd** from a terminal. Keep the executable and resources together. |
+| Source code ZIP | Developer sources; this is not the runnable Windows package. |
 
-Sophos Connect must already be installed and configured for the VPN connection feature. Code generation and copying work without Sophos Connect.
+Get the EXE or Windows ZIP from this repository's **Releases** page. If none has been published, a maintainer needs to build the first release. Packages are unsigned unless code signing is configured.
+
+Sophos Connect must be installed and configured to use the VPN connection button or CLI command. Code generation and profile management work without a VPN client. Windows PowerShell, included with Windows, is used for account-bound encryption.
 
 ## What can it do?
 
-| Feature | Benefit |
+| Feature | What it provides |
 | --- | --- |
-| QR or manual setup | Import a QR screenshot, Base32 secret or `otpauth://totp/` address. |
-| Live code and countdown | See the current code and remaining validity. |
-| Copy actions | Copy a code, username or password combined with OTP. |
-| Sophos Connect integration | Submit a connection request using the installed CLI. |
-| Encrypted local profile | Remember OTP settings, language, connection name and credentials. |
-| Restore on next launch | Avoid entering the same details repeatedly. VPN sign-in still requires a click. |
-| Multiple languages | Turkish by default, plus English, German, French and Spanish, with flag icons. |
-| Glass-style interface | A dark interface with translucent panels. |
+| Multiple named profiles | Keep work and personal accounts separate; select one to load it. |
+| Edit or duplicate | Update an existing profile or save its details as a new profile. |
+| Remember the selected profile | Restore the last selected account after reopening the app or browser. |
+| Save credentials before OTP setup | A profile can be saved even when no OTP secret has been added yet. |
+| Protect unfinished edits | Choose to save, discard or cancel before switching away from changes. |
+| Delete one profile | Confirm deletion of the selected profile while preserving the others. |
+| QR and manual setup | Import a QR image, Base32 secret or TOTP setup URI. |
+| Sophos sign-in | Submit the saved username and current password + fresh OTP to Sophos Connect. |
+| English CLI | List, select and delete profiles, print a code, or request a connection. |
+| Five languages | Turkish is the default; English, German, French and Spanish are also available, with flags. |
 
-## First-time setup
+## Working with profiles
 
-### 1. Add your OTP account
+1. Select **New profile** and enter a descriptive profile name.
+2. Fill in the exact Sophos connection name, username and current password. Do not append an OTP to the stored password.
+3. Add the OTP setup secret or QR image if available. You can also save the credentials now and configure OTP later.
+4. Select **Save encrypted profile**. For an existing profile, use **Save changes**.
+5. Choose an entry from **Saved profiles** to load it. **Save as a new profile** creates a separate copy.
 
-Choose your Sophos portal's QR image or enter the **OTP setup secret**. This field is not your account password.
+Saving is explicit. The optional **Save changes when connecting** checkbox also saves the current form when you press Connect. Clearing the current session keeps saved profiles. Deleting a saved profile requires its own confirmation.
 
-For manual setup, match your account's algorithm, code length and period. A TOTP QR address supplies these settings automatically. Supported options: SHA1, SHA256 and SHA512; 6 or 8 digits; a 10–300 second period.
+## One local encrypted store
 
-Select **Generate code** and compare the first code with your current authenticator. Keep your device clock synchronized.
+The browser interface, packaged desktop app and CLI share the same SQLite file when run under the same Windows account:
 
-### 2. Enter connection details
+    %APPDATA%\sophos-otp-project\profiles.sqlite
 
-Type the connection name yourself, then enter your username and **current password without an OTP**. Names are not automatically listed; only a profile that you explicitly save can be restored.
+This fixes the earlier behavior where browser sessions could not save profiles. The local API now handles persistence in both modes; installing a separate database service is unnecessary.
 
-For VPN profiles expecting an OTP appended to the password, **Connect to Sophos** adds a fresh code and submits the combined value. Check the actual VPN status in Sophos Connect. A submitted request does not mean the VPN has connected.
+Profile names, credentials and OTP secrets are encrypted with Windows DPAPI before they reach SQLite. There is no plaintext fallback when Windows encryption is unavailable. Encryption uses the current Windows account, not an app-specific master password. Other programs running as the same Windows user are outside this protection boundary. Copying the database alone is not a portable export to another account or computer.
 
-SSO and profiles with a separate OTP field may need a different sign-in method. The application does not disconnect an existing VPN or sign in automatically.
+Existing single-profile databases are preserved and migrated by the desktop app. If a legacy profile cannot be decrypted, the original encrypted record is retained and the app displays an import notice. Open the updated desktop app once under the Windows account that created that record.
 
-### 3. Save once, restore next time
+Developers and automated tests can set **SOPHOS_OTP_DATA_DIR** to an isolated data directory. All entry points must use the same directory to share profiles. Stored databases, build outputs and environment files are excluded from Git.
 
-Keep **Remember on this device** enabled and select **Save encrypted profile** after entering your details. With remembering enabled, generating a code and requesting a connection also save the current profile.
+The local API binds to the loopback interface, checks request origins and hosts, and requires a per-process session token. Passwords and setup secrets are never sent to a cloud service. Sophos's own command-line utility receives password + OTP briefly as process arguments. Clearing the app does not clear the system clipboard.
 
-On the next launch under the same Windows account, saved settings and credentials are restored.
+## CLI
 
-- **Clear session** clears the current screen and memory references, keeping the saved profile.
-- **Delete saved profile** removes the stored profile and clears the current session.
-- Disabling **Remember on this device** stops automatic saves; use **Delete saved profile** to remove an existing record.
+Extract the **Windows ZIP**, open a terminal in that folder, and run:
 
-Regular browser development sessions are temporary. Encrypted persistence is available in the desktop application.
+    .\Sophos-OTP-CLI.cmd help
+    .\Sophos-OTP-CLI.cmd profiles
+    .\Sophos-OTP-CLI.cmd use <profile-id>
+    .\Sophos-OTP-CLI.cmd code
+    .\Sophos-OTP-CLI.cmd code <profile-id>
+    .\Sophos-OTP-CLI.cmd connect <profile-id>
+    .\Sophos-OTP-CLI.cmd delete <profile-id>
 
-## Local storage and privacy
+The wrapper uses the runtime included with the app; it does not require a system Node.js installation. Replace **<profile-id>** with an ID printed by **profiles**. An asterisk marks the selected profile. **code** and **connect** use that profile when the ID is omitted. **delete** always requires an explicit ID.
 
-SQLite is part of the bundled runtime. An application-specific `profiles.sqlite` file is created in the current user's application-data directory, outside the executable folder and source repository.
+Create and edit profiles in the interface. Passwords and OTP secrets are never CLI arguments or listing output. The **code** command intentionally prints the current one-time code. Connection requests are explicit and report submission; check the actual VPN status in Sophos Connect. A code near expiry is rejected, so retry after it refreshes.
 
-The entire saved profile is encrypted with Electron's Windows OS encryption provider before it is written to SQLite. If encryption is unavailable, saving fails instead of using plaintext. Saved credentials are tied to the Windows account that encrypted them.
+## Development
 
-QR images are read in the UI and are not stored. OTP generation is local. The packaged API listens only on loopback, uses a dynamic port and requires a per-launch session token. There is no cloud synchronization.
+Use Node.js 24 for development. From the repository root:
 
-Important boundaries:
+    npm ci
+    npm run dev
 
-- Windows account encryption does not protect against malicious software running as that same user.
-- Sophos CLI temporarily receives password + OTP as process arguments.
-- Copying places sensitive values on the system clipboard. Clearing a session does not clear it.
-- Clearing memory references is not guaranteed physical erasure. Deleting a profile does not remove filesystem backups.
-
-Follow your organization's OTP policy. Never commit actual QR codes, secrets, credentials, connection addresses or private screenshots.
-
-## For developers
-
-Only developers need **Node.js 24 LTS** and npm.
-
-```sh
-npm ci
-node node_modules/electron/install.js
-npm test
-npm run desktop:dev
-```
-
-Run commands from the repository root; this project uses npm workspaces.
+The browser interface opens at http://127.0.0.1:4200 and the local API uses port 3000. After updating the project, restart the development command so both services load the latest code. The browser now supports encrypted persistence on Windows.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Browser development UI at http://127.0.0.1:4200 and local backend. |
-| `npm run build` | Build the Angular UI and NestJS API. |
-| `npm test` | Run OTP, CLI, API, translation and SQLite tests. |
-| `npm run test:electron` | Test the built desktop UI and real Windows encryption in a temporary profile. |
-| `npm run desktop:dev` | Build and open the desktop application. |
-| `npm run dist:win` | Build a standalone Windows x64 executable in `release/`. |
+| npm test | OTP, API, profile migration/persistence, encryption-adapter and CLI tests. |
+| npm run build | Compile the API and production interface. |
+| npm run desktop:dev | Build and run the desktop app. |
+| npm run cli -- profiles | Run the developer CLI. Build first for code/connect commands. |
+| npm run test:electron | Run an isolated desktop smoke test with real Windows encryption. |
+| npm run dist:win | Create the portable EXE and Windows ZIP in release/. |
 
-Windows developers can use `START-DEV.cmd` for browser development. Backend source changes require restarting the development command.
+## Project structure
 
-### Project structure
-
-| Folder | Responsibility |
+| Directory | Responsibility |
 | --- | --- |
-| `frontend/` | Angular + PrimeNG UI and language dictionaries. |
-| `backend/` | NestJS API, TOTP calculation and Sophos CLI integration. |
-| `shared/` | Shared TypeScript contracts. |
-| `desktop/` | Electron shell, restricted IPC and encrypted SQLite vault. |
-| `.github/workflows/` | Windows testing, packaging and tagged releases. |
+| frontend/ | Angular/PrimeNG interface and five language dictionaries. |
+| backend/ | Local API, TOTP generation and Sophos integration. |
+| shared/ | Shared TypeScript contracts. |
+| storage/ | Multi-profile SQLite store, Windows encryption and legacy migration. |
+| desktop/ | Electron window, isolated preload and Windows CLI launcher. |
+| cli/ | English terminal commands backed by the same profile store. |
 
-The desktop renderer uses context isolation, a sandbox and disabled Node integration. Profile operations are restricted to the application's own main frame.
+Tests use synthetic accounts and a test encryption adapter; they never connect to a customer's VPN. They cover restart persistence, independent profiles, safe deletion, stale/concurrent edits, legacy import, sanitized errors, session protection and CLI behavior. The separate desktop smoke test exercises the real Windows encryption provider.
 
-### Tests
+## Publishing
 
-Coverage includes RFC 6238 vectors, invalid inputs, expiry boundaries, CLI argument handling without a shell, concurrent requests, sanitized errors, API token/origin/host checks, complete translations, encrypted storage, restart restoration, deletion and encryption failures.
-
-Unit tests use synthetic credentials and a test encryption adapter. The Electron smoke test uses a separate temporary profile and the real Windows encryption provider. Tests do not connect to a customer's VPN.
-
-## Publishing a runnable GitHub release
-
-The Windows workflow runs tests and creates an executable for pushes and pull requests. Download it from the workflow's **Artifacts** section.
-
-To publish a release, a maintainer pushes a version tag matching `package.json`:
-
-```sh
-git tag v1.1.1
-git push origin v1.1.1
-```
-
-After tests, the production build and the desktop smoke test pass, the workflow attaches the executable to that GitHub release. Customers download the executable, not the source ZIP.
-
-Generated packages, local databases and environment files are excluded from source control.
+The Windows GitHub workflow runs tests, builds, runs the desktop smoke test and packages both Windows downloads. Artifacts are available from successful workflow runs. To publish a release, push a version tag matching package.json, for example v1.2.0. The workflow attaches the EXE and Windows ZIP only after its checks pass.
 
 ## Troubleshooting
 
-| Problem | Check |
+| Problem | What to check |
 | --- | --- |
-| Codes differ from the phone | System time, setup secret, algorithm, period and digits. |
-| Sophos CLI is unavailable | Standard Windows installation and the Sophos Connect service. |
-| Connection is not found | Exact connection name in Sophos Connect. |
-| Saved profile cannot be decrypted | Use the original Windows account or delete and recreate the profile. |
-| Settings are not restored in a browser | Use the desktop application for encrypted persistence. |
+| Profile list or saving fails after an update | Restart both development services and refresh the page. |
+| Windows encryption is unavailable | Run under your own Windows session; constrained service/sandbox accounts may not have working DPAPI keys. Nothing is saved in plaintext. |
+| Profile cannot be decrypted | Use the original Windows account and computer. Other profiles can still be opened. |
+| Legacy import notice | Open the desktop app once under the original Windows account. |
+| Profile changed in another window | Reload the profile before saving; the newer revision is protected. |
+| CLI cannot find profiles | Use the same Windows account and SOPHOS_OTP_DATA_DIR setting as the app. |
+| Codes differ from your phone | Check the device time, secret, algorithm, period and digits. |
+| Sophos connection is not found | Enter its exact configured connection name. |
 
-This is a local desktop utility, not a public web service. Windows x64 is the configured release target.
+Windows x64 is the supported packaged target. This is a local utility, not a public web service.

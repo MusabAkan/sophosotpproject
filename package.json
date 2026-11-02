@@ -4,18 +4,20 @@
   "workspaces": [
     "backend",
     "frontend",
-    "shared"
+    "shared",
+    "storage"
   ],
   "scripts": {
     "dev": "concurrently -k -n API,WEB \"npm run dev -w backend\" \"npm run start -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
     "test": "npm run test:backend && npm run test:desktop",
     "test:backend": "npm run test -w backend",
-    "test:desktop": "node --test desktop/test/*.test.cjs",
+    "test:desktop": "node --test storage/test/*.test.cjs cli/test/*.test.cjs",
     "desktop:dev": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never",
+    "dist:win": "npm run build && electron-builder --win portable zip --x64 --publish never",
     "dist:dir": "npm run build && electron-builder --dir --win --x64 --publish never",
-    "test:electron": "electron desktop/smoke.cjs --smoke-test"
+    "test:electron": "electron desktop/smoke.cjs --smoke-test",
+    "cli": "node cli/index.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -28,7 +30,7 @@
   "overrides": {
     "multer": "^2.5.0"
   },
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Local OTP authenticator with encrypted profiles and Sophos Connect integration",
   "main": "desktop/main.cjs",
   "author": "Sophos OTP contributors",
@@ -37,6 +39,7 @@
     "@nestjs/core": "11.2.8",
     "@nestjs/platform-express": "11.2.8",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "@sophos-otp/storage": "1.0.0"
   }
 }

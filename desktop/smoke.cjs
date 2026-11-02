@@ -1,15 +1,11 @@
-
-const {app,BrowserWindow}=require('electron');
-const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const assert=require('node:assert/strict');
+const {app}=require('electron');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
 const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'sophos-otp-smoke-'));
-app.setPath('userData',temporary);
+process.env.SOPHOS_OTP_DATA_DIR=temporary;app.setPath('userData',path.join(temporary,'electron'));
 app.commandLine.appendSwitch('disable-gpu');
-const deadline=setTimeout(()=>{console.error('FAIL: desktop smoke test timed out.');app.exit(1);},30000);
+const deadline=setTimeout(()=>{console.error('FAIL: desktop smoke test timed out.');app.exit(1);},60000);
+function waitFor(window,expression){return window.webContents.executeJavaScript('new Promise((resolve,reject)=>{let count=0;const timer=setInterval(()=>{if('+expression+'){clearInterval(timer);resolve(true);}else if(++count>200){clearInterval(timer);reject(new Error("UI readiness timeout"));}},100);})');}
 let started=false;
-function waitFor(window,expression){
-  return window.webContents.executeJavaScript('new Promise((resolve,reject)=>{let count=0;const timer=setInterval(()=>{if('+expression+'){clearInterval(timer);resolve(true);}else if(++count>100){clearInterval(timer);reject(new Error("UI readiness timeout"));}},100);})');
-}
 app.on('browser-window-created',(_event,window)=>{
   if(started)return;started=true;
   window.webContents.once('did-finish-load',async()=>{
@@ -17,22 +13,21 @@ app.on('browser-window-created',(_event,window)=>{
       await waitFor(window,'document.querySelector("app-root h1")?.textContent?.includes("Kodun burada.")');
       await waitFor(window,'document.querySelector(".language-select .language-flag")?.naturalWidth > 0');
       assert.equal(await window.webContents.executeJavaScript('getComputedStyle(document.querySelector(".workspace")).display'),'grid');
-      const synthetic={version:1,language:'de',profile:'Example VPN',username:'smoke-test-user',password:'smoke-only-password',otp:{secret:'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',algorithm:'SHA1',period:30,digits:6}};
-      await window.webContents.executeJavaScript('window.sophosDesktop.save('+JSON.stringify(synthetic)+')');
-      const restored=await window.webContents.executeJavaScript('window.sophosDesktop.load()');
-      assert.deepEqual(restored,synthetic);
+      const token=(await window.webContents.executeJavaScript('window.sophosDesktop.session()')).token,base=new URL(window.webContents.getURL()).origin;
+      const headers={'X-App-Token':token,'Content-Type':'application/json'};
+      async function post(endpoint,value){const response=await fetch(base+'/api/profiles/'+endpoint,{method:'POST',headers,body:JSON.stringify(value)});assert.equal(response.status,201);return response.json();}
+      const synthetic={version:2,name:'Smoke Work',provider:'sophos',language:'tr',profile:'Example VPN',username:'smoke-test-user',password:'smoke-only-password',otp:{secret:'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',algorithm:'SHA1',period:30,digits:6}};
+      const first=await post('save',synthetic),second=await post('save',{...synthetic,name:'Smoke Home',username:'smoke-second-user'});
+      async function reload(){const loaded=new Promise(resolve=>window.webContents.once('did-finish-load',resolve));window.webContents.reload();await loaded;}
+      await reload();await waitFor(window,'document.querySelector("#vpn-username")?.value==="smoke-second-user"');
+      await post('load',{id:first.id});await reload();await waitFor(window,'document.querySelector("#vpn-username")?.value==="smoke-test-user"');
+      assert.equal(await window.webContents.executeJavaScript('document.querySelector("#profile-name").value'),'Smoke Work');
       const bytes=fs.readFileSync(path.join(temporary,'profiles.sqlite'));
-      for(const value of [synthetic.username,synthetic.password,synthetic.profile,synthetic.otp.secret])assert.equal(bytes.includes(Buffer.from(value)),false);
-      const loaded=new Promise(resolve=>window.webContents.once('did-finish-load',resolve));
-      window.webContents.reload();await loaded;
-      await waitFor(window,'document.documentElement.lang==="de" && document.querySelector("#vpn-username")?.value==="smoke-test-user"');
-      assert.equal(await window.webContents.executeJavaScript('document.querySelector("#vpn-password").value'),synthetic.password);
-      await window.webContents.executeJavaScript('window.sophosDesktop.remove()');
-      assert.equal(await window.webContents.executeJavaScript('window.sophosDesktop.load()'),null);
-      console.log('PASS: desktop load, Turkish default, real Windows encryption, SQLite persistence, language/credential restoration and deletion.');
-      clearTimeout(deadline);app.quit();
-    }catch{console.error('FAIL: desktop UI or encrypted-profile integration.');clearTimeout(deadline);app.exit(1);}
+      for(const value of [synthetic.name,synthetic.username,synthetic.password,synthetic.otp.secret])assert.equal(bytes.includes(Buffer.from(value)),false);
+      await post('remove',{id:second.id});const catalog=await (await fetch(base+'/api/profiles',{headers})).json();assert.equal(catalog.profiles.length,1);assert.equal(catalog.profiles[0].id,first.id);
+      console.log('PASS: desktop rendering, real Windows encryption, multiple profiles, reload, selection and isolated deletion.');clearTimeout(deadline);app.quit();
+    }catch{console.error('FAIL: desktop UI or Windows encrypted-profile integration.');clearTimeout(deadline);app.exit(1);}
   });
 });
-app.on('will-quit',()=>{try{fs.rmSync(temporary,{recursive:true,force:true});}catch{}});
+app.on('will-quit',()=>{if(path.resolve(temporary).startsWith(path.resolve(os.tmpdir())+path.sep)){try{fs.rmSync(temporary,{recursive:true,force:true});}catch{}}});
 require('./main.cjs');

@@ -8,7 +8,9 @@ export interface ConnectVpnResponse { submitted: true; message: string; }
 
 
 export type AppLanguage = 'tr' | 'en' | 'de' | 'fr' | 'es';
-export interface SavedProfile { version: 1; language: AppLanguage; profile: string; username: string; password: string; otp: GenerateOtpRequest | null; }
-export interface DesktopBridge { session(): Promise<{token: string}>; load(): Promise<SavedProfile | null>; save(profile: SavedProfile): Promise<boolean>; remove(): Promise<boolean>; }
+export interface ProfileInput { version: 2; id?: string; revision?: number; name: string; provider: 'sophos'; language: AppLanguage; profile: string; username: string; password: string; otp: GenerateOtpRequest | null; }
+export interface SavedProfile extends ProfileInput { id: string; revision: number; }
+export interface ProfileSummary { id: string; name: string; provider: 'sophos'; updatedAt: string; readable: boolean; }
+export interface ProfileCatalog { profiles: ProfileSummary[]; selectedId: string | null; legacyPending: boolean; }
+export interface DesktopBridge { session(): Promise<{token: string}>; }
 declare global { interface Window { sophosDesktop?: DesktopBridge; } }
-

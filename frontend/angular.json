@@ -12,6 +12,7 @@
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
+          "defaultConfiguration": "production",
           "options": {
             "outputPath": "dist/browser",
             "index": "src/index.html",
@@ -29,6 +30,11 @@
             ]
           },
           "configurations": {
+            "development": {
+              "optimization": false,
+              "sourceMap": true,
+              "extractLicenses": false
+            },
             "production": {
               "optimization": {
                 "scripts": true,
@@ -52,7 +58,7 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "buildTarget": "otp-web:build",
+            "buildTarget": "otp-web:build:development",
             "proxyConfig": "proxy.conf.json"
           }
         }

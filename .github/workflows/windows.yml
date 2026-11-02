@@ -27,11 +27,13 @@ jobs:
       - name: Smoke-test Electron and Windows encryption
         run: npm run test:electron
       - name: Package Windows executable
-        run: npx electron-builder --win portable --x64 --publish never
+        run: npx electron-builder --win portable zip --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: Sophos-OTP-Windows-x64
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/*.zip
           if-no-files-found: error
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -51,5 +53,5 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         shell: pwsh
         run: |
-          $executables = @(Get-ChildItem release/*.exe | ForEach-Object FullName)
+          $executables = @(Get-ChildItem release/* -File | Where-Object Extension -in '.exe','.zip' | ForEach-Object FullName)
           gh release create $env:RELEASE_TAG @executables --title "Sophos OTP $env:RELEASE_TAG" --generate-notes
